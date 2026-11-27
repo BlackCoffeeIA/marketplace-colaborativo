@@ -1,127 +1,40 @@
 import User from '../models/User.js';
+import Product from '../models/Product.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { asyncHandler } from '../middleware/errorMiddleware.js';
 
-// Registrar un nuevo usuario
-export const registerUser = async (req, res) => {
-  const { name, email, password } = req.body;
+const token = id => jwt.sign({ id: String(id) }, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
+const profile = u => ({ _id: u.id, name: u.name, email: u.email, role: u.role });
+const missing = res => res.status(404).json({ message: 'Usuario no encontrado' });
 
-  try {
-    const userExists = await User.findOne({ email });
+export const registerUser = asyncHandler(async (req, res) => {
+  if (await User.exists({ email: req.body.email })) return res.status(409).json({ message: 'El usuario ya existe' });
+  const user = await User.create(req.body);
+  res.status(201).json({ ...profile(user), token: token(user.id) });
+});
 
-    if (userExists) {
-      return res.status(400).json({ message: 'El usuario ya existe' });
-    }
-
-    const user = await User.create({
-      name,
-      email,
-      password,
-    });
-
-    if (user) {
-      res.status(201).json({
-        _id: user.id,
-        name: user.name,
-        email: user.email,
-        token: generateToken(user.id),
-      });
-    } else {
-      res.status(400).json({ message: 'Datos de usuario no válidos' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Error al registrar el usuario' });
+export const authUser = asyncHandler(async (req, res) => {
+  const user = await User.findOne({ email: req.body.email }).select('+password');
+  if (!user || !(await bcrypt.compare(req.body.password, user.password))) {
+    return res.status(401).json({ message: 'Credenciales no válidas' });
   }
-};
+  res.json({ ...profile(user), token: token(user.id) });
+});
 
-// Autenticar usuario y obtener un token
-export const authUser = async (req, res) => {
-  const { email, password } = req.body;
+export const getUserById = asyncHandler(async (req, res) => {
+  res.json(profile(req.user));
+});
 
-  try {
-    const user = await User.findOne({ email });
+export const updateUser = asyncHandler(async (req, res) => {
+  const user = await User.findByIdAndUpdate(req.user._id, { $set: req.body }, { new: true, runValidators: true });
+  if (!user) return missing(res);
+  res.json(profile(user));
+});
 
-    if (user && (await bcrypt.compare(password, user.password))) {
-      res.json({
-        _id: user.id,
-        name: user.name,
-        email: user.email,
-        token: generateToken(user.id),
-      });
-    } else {
-      res.status(401).json({ message: 'Credenciales no válidas' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Error al autenticar el usuario' });
-  }
-};
-
-// Generar un token JWT
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
-  });
-};
-
-// Obtener todos los usuarios
-export const getAllUsers = async (req, res) => {
-  try {
-    const users = await User.find({});
-    res.status(200).json(users);
-  } catch (error) {
-    res.status(500).json({ message: 'Error al obtener los usuarios' });
-  }
-};
-
-// Obtener un usuario por ID
-export const getUserById = async (req, res) => {
-    try {
-      const user = await User.findById(req.params.id);
-  
-      if (user) {
-        res.json(user);
-      } else {
-        res.status(404).json({ message: 'Usuario no encontrado' });
-      }
-    } catch (error) {
-      res.status(500).json({ message: 'Error al obtener el usuario' });
-    }
-  };
-
-// Actualizar un usuario
-export const updateUser = async (req, res) => {
-    const { name, email, role } = req.body;
-  
-    try {
-      const user = await User.findById(req.params.id);
-  
-      if (user) {
-        user.name = name || user.name;
-        user.email = email || user.email;
-        user.role = role || user.role;
-  
-        const updatedUser = await user.save();
-        res.json(updatedUser);
-      } else {
-        res.status(404).json({ message: 'Usuario no encontrado' });
-      }
-    } catch (error) {
-      res.status(500).json({ message: 'Error al actualizar el usuario' });
-    }
-  };
-
-// Eliminar un usuario
-export const deleteUser = async (req, res) => {
-    try {
-      const user = await User.findByIdAndDelete(req.params.id);
-  
-      if (user) {
-        res.json({ message: 'Usuario eliminado' });
-      } else {
-        res.status(404).json({ message: 'Usuario no encontrado' });
-      }
-    } catch (error) {
-      console.error('Error al eliminar el usuario:', error);
-      res.status(500).json({ message: 'Error al eliminar el usuario' });
-    }
-  };
+export const deleteUser = asyncHandler(async (req, res) => {
+  if (await Product.exists({ user: req.user._id })) return res.status(409).json({ message: 'Elimine sus productos antes de eliminar la cuenta' });
+  const user = await User.findByIdAndDelete(req.user._id);
+  if (!user) return missing(res);
+  res.json({ message: 'Usuario eliminado' });
+});

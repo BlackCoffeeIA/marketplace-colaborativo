@@ -1,17 +1,15 @@
 # Collaborative Marketplace API
 
-REST API for a collaborative marketplace. Built with Node.js, Express and MongoDB to manage users, product listings and product reviews.
-
-**Status:** Development project. Intended for local development and learning; not production-ready.
+A REST API for a marketplace where users can publish products and leave reviews. This backend project uses Node.js, Express and MongoDB.
 
 ## Features
 
-- User registration and login with JWT authentication and bcrypt password hashing.
-- Product catalog with prices, stock, categories and image URLs.
-- Product creation, editing and deletion routes.
-- Product reviews and average rating calculation.
-- User management endpoints.
-- Request rate limiting, response compression and centralized error middleware.
+- Account registration and login with hashed passwords and JWTs.
+- Product catalog with pagination, prices, inventory and categories.
+- Authenticated product creation and owner-only updates/deletion.
+- Product reviews with rating validation and average ratings.
+- Self-service account management, without a public user directory.
+- Request validation, rate limiting and consistent error handling.
 
 ## Tech stack
 
@@ -21,109 +19,91 @@ Node.js · Express · MongoDB · Mongoose · JWT · bcryptjs · Joi
 
 ```mermaid
 flowchart LR
-    A[API client] --> B[Express server]
-    B --> C[Routes]
+    A[API client] --> B[Express app]
+    B --> C[Routes and middleware]
     C --> D[Controllers]
     D --> E[Mongoose models]
     E --> F[(MongoDB)]
-    G[JWT middleware] -. Protected product routes .-> C
 ```
-
-The application separates routing, business logic, middleware and database models.
 
 ```text
-marketplace-colaborativo/
-├── config/          # MongoDB connection
-├── controllers/     # User and product operations
-├── middleware/      # Authentication and error handling
-├── models/          # Mongoose schemas
-├── routes/          # API endpoints
-├── server.js       # Express entry point
-└── package.json
+config/        Database connection
+controllers/   User and product operations
+middleware/    Authentication, validation and errors
+models/        Database schemas
+routes/        REST API endpoints
+test/          HTTP regression tests
+app.js         Express application factory
+server.js      Startup and database initialization
 ```
 
-## Getting started
+## Local setup
 
-Requirements: Node.js, npm and a MongoDB instance for local development.
+Requirements: Node.js 22 or newer, npm and a local MongoDB instance.
 
 ```bash
 git clone https://github.com/BlackCoffeeIA/marketplace-colaborativo.git
 cd marketplace-colaborativo
 npm ci
+cp .env.example .env
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
-Configure a local `.env` file with your own development values. Never commit real credentials.
-
-```dotenv
-PORT=5000
-MONGO_URI=mongodb://127.0.0.1:27017/marketplace
-JWT_SECRET=replace_with_a_unique_local_development_secret
-```
-
-Run the development server:
+On PowerShell, use `Copy-Item .env.example .env` instead of `cp` if needed. Put the generated secret in your local `JWT_SECRET` field. Configure `MONGO_URI` for your database; do not use production data in local development.
 
 ```bash
 npm run dev
 ```
 
-The API uses port 5000 by default. To start without Nodemon, use `npm start`.
+The server defaults to port 5000. Use `npm start` without Nodemon.
 
-## API reference
+## API
 
-Base URL: `http://localhost:5000/api`
+Base URL: `http://localhost:5000/api`. Authenticated requests use `Authorization: Bearer <token>`.
 
-### Products
-
-| Method | Endpoint | JWT required |
+| Method | Endpoint | Access |
 | --- | --- | --- |
-| GET | /products | No |
-| GET | /products/:id | No |
-| GET | /products/:id/reviews | No |
-| POST | /products | Yes |
-| PUT | /products/:id | Yes |
-| DELETE | /products/:id | Yes |
-| POST | /products/:id/reviews | Yes |
+| POST | /users/register | Public |
+| POST | /users/login | Public |
+| GET | /users/:id | Account owner |
+| PUT | /users/:id | Account owner |
+| DELETE | /users/:id | Account owner |
+| GET | /products?page=1&limit=20 | Public |
+| GET | /products/:id | Public |
+| POST | /products | Authenticated |
+| PUT | /products/:id | Product owner |
+| DELETE | /products/:id | Product owner |
+| GET | /products/:id/reviews | Public |
+| POST | /products/:id/reviews | Authenticated |
 
-Protected requests use the `Authorization: Bearer <token>` header.
+The former global user listing endpoint is intentionally denied. Account updates accept name and email only. Product updates accept partial fields. Account deletion is blocked while the account has listed products.
 
-### Users
-
-| Method | Endpoint |
-| --- | --- |
-| POST | /users/register |
-| POST | /users/login |
-| GET | /users |
-| GET | /users/:id |
-| PUT | /users/:id |
-| DELETE | /users/:id |
-
-User management routes still require authorization hardening. Use this project only with disposable local test data.
-
-### Example: list products
+### Example
 
 ```bash
 curl http://localhost:5000/api/products
 ```
 
-Example response for an empty catalog:
-
 ```json
 {
   "success": true,
   "data": [],
-  "message": "Productos obtenidos correctamente"
+  "message": "Productos obtenidos correctamente",
+  "pagination": { "page": 1, "limit": 20, "total": 0 }
 }
 ```
 
-## Next steps
+## Testing
 
-- Harden authentication, authorization and sensitive data handling.
-- Apply consistent request validation and error responses.
-- Review compatibility with the installed Mongoose version.
-- Add automated API tests and pagination.
-- Improve environment configuration and secret management.
+```bash
+npm test
+```
 
-The current repository has no automated test suite or frontend application.
+The Node.js test runner starts the HTTP application with mocked database methods. The suite checks authentication, account and product ownership, private fields and invalid input. A live MongoDB integration suite is still needed.
+
+## Status
+
+Development portfolio project, not a production service. Before deployment, verify real database behavior, audit dependency versions, add integration tests and review data retention, account deletion consistency, token revocation and operational controls.
 
 ---
 
