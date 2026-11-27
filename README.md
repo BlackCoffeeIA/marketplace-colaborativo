@@ -1,6 +1,8 @@
 # Collaborative Marketplace API
 
-A REST API for a marketplace where users can publish products and leave reviews. This backend project uses Node.js, Express and MongoDB.
+A backend course project built to practice REST API development with Node.js, Express and MongoDB. The example is a small marketplace where users can publish products and leave reviews.
+
+I revisited the original class project to improve input validation, access control, project structure and automated testing.
 
 ## Features
 
@@ -99,11 +101,11 @@ curl http://localhost:5000/api/products
 npm test
 ```
 
-The Node.js test runner starts the HTTP application with mocked database methods. The suite checks authentication, account and product ownership, private fields and invalid input. A live MongoDB integration suite is still needed.
+The Node.js test runner starts the HTTP application with mocked database methods. The suite checks authentication, account and product ownership, private fields and invalid input. The tests use mocked database methods and do not require a running MongoDB instance.
 
-## Status
+## About this project
 
-Development portfolio project, not a production service. Before deployment, verify real database behavior, audit dependency versions, add integration tests and review data retention, account deletion consistency, token revocation and operational controls.
+This is an educational backend demo, not a commercial marketplace. Its purpose is to demonstrate API design, database modeling, authentication and CRUD operations. It does not include a frontend, checkout or payment processing.
 
 ---
 
